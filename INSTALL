@@ -17,5 +17,5 @@ Actually, it can be installed copying transdb directory to any directory include
 
 REQUIREMENTS
 
-TransDb requires Python 2.3 or later, and Django newforms-admin branch.
+TransDb requires Python 2.3 or later, and Django trunk (0.96 should be supported).
 

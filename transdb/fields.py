@@ -5,7 +5,7 @@ from django.utils.translation import ugettext as _
 from django.utils.encoding import force_unicode
 from django.newforms.fields import Field
 from django.newforms import ValidationError
-from widgets import TransCharWidget, TransTextWidget
+from django import forms as oldforms
 
 def get_default_language_name():
     '''
@@ -34,23 +34,57 @@ class TransDbValue(unicode):
         else:
             return ''
 
-class TransFormField(Field):
+class TransFormField(oldforms.TextField):
     '''
-    newforms field, used when ModelForm (or deprecated form_for_model/form_form_instance) is called
-    Also implements form validation in admin
     '''
+    def prepare(self, new_data):
+        value = {}
+        for lang_code, lang_name in settings.LANGUAGES:
+            value[lang_code] = new_data['%s_%s' % (self.field_name, lang_code)]
+        new_data[self.field_name] = value
+        super(TransFormField, self).prepare(new_data)
+
+    def get_input(self, name, value, lang, attrs, id=None):
+        value_html = (value and ' value="%s"' % value) or ''
+        id_html = (id and ' id="id_%s"' % name) or ''
+        return '<input type="text" name="%s_%s"%s%s/>' % (name, lang, value_html, id_html)
+        
+    def render(self, value):
+        #import pdb; pdb.set_trace()
+        if value and hasattr(value, 'raw_data'):
+            value_dict = value.raw_data
+        else:
+            value_dict = {}
+        output = []
+        name = self.field_name
+        for lang_code, lang_name in settings.LANGUAGES:
+            value_for_lang = ''
+            if value_dict.has_key(lang_code):
+                value_for_lang = value_dict[lang_code]
+            if lang_code == settings.LANGUAGE_CODE:
+                input = self.get_input(name, value_for_lang, lang_code, "", True)
+            else:
+                input = self.get_input(name, value_for_lang, lang_code, "")
+            output.append('<li style="list-style-type: none; float: left; margin-right: 1em;"><span style="display: block;">%s:</span>%s</li>' % (force_unicode(lang_name), input))
+        return u'<ul>%s</ul>' % (u''.join(output))
+
     def clean(self, value):
         if self.required and not value[settings.LANGUAGE_CODE]:
             raise ValidationError, _("This field cannot be null for default language '%s'." % get_default_language_name())
         else:
             return value
 
-class TransField(models.Field):
+class TransCharField(models.Field):
     '''
     Model field to be subclassed
     Used for storing a string in many languages at database (with python's dictionary format)
     pickle module could be used, but wouldn't alow search on fields?
     '''
+    __metaclass__ = models.SubfieldBase
+
+    def get_manipulator_field_objs(self):
+            return [TransFormField] 
+
     def get_internal_type(self):
         return 'TextField'
 
@@ -81,29 +115,9 @@ class TransField(models.Field):
         defaults.update(kwargs)
         return super(TransField, self).formfield(**defaults)
 
-    def flatten_data(self, follow, obj=None): 
-        '''
-        for serializing objects
-        '''
-        return {self.attname: self._get_val_from_obj(obj).raw_data} 
+    def validate_full(self, field_data, all_data):
+        import pdb; pdb.set_trace()
+        super(TransCharField, self).validate_full(field_data, all_data)
 
-class TransCharField(TransField):
-    '''
-    TransField used with CharField widget
-    '''
-    __metaclass__ = models.SubfieldBase
-
-    def formfield(self, **kwargs):
-        kwargs['widget'] = TransCharWidget
-        return super(TransCharField, self).formfield(**kwargs)
-
-class TransTextField(TransField):
-    '''
-    TransField used with CharField widget
-    '''
-    __metaclass__ = models.SubfieldBase
-
-    def formfield(self, **kwargs):
-        kwargs['widget'] = TransTextWidget
-        return super(TransTextField, self).formfield(**kwargs)
+        
 

@@ -1,2 +1,2 @@
-from fields import TransCharField, TransTextField
+from fields import TransCharField
 
