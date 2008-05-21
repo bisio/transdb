@@ -108,11 +108,6 @@ class TransField(models.Field):
     def get_db_prep_save(self, value):
         return unicode(value.raw_data)
 
-    def formfield(self, **kwargs):
-        defaults = {'form_class': TransFormField}
-        defaults.update(kwargs)
-        return super(TransField, self).formfield(**defaults)
-
 class TransCharField(TransField):
     __metaclass__ = models.SubfieldBase
 
