@@ -1,4 +1,5 @@
 from django.db import models
+from django.core import exceptions, validators
 from django.conf import settings
 from django.utils.translation import get_language
 from django.utils.translation import ugettext as _
@@ -6,6 +7,7 @@ from django.utils.encoding import force_unicode, smart_str, smart_unicode
 from django.forms.fields import Field
 from django.forms import ValidationError
 from widgets import TransCharWidget, TransTextWidget
+from copy import deepcopy
 
 def get_default_language_name():
     '''
@@ -30,7 +32,7 @@ class TransDbValue(unicode):
 
     def get_in_language(self, language):
         if self.raw_data and self.raw_data.has_key(language):
-            return self.raw_data[language]
+            return smart_unicode(self.raw_data[language])
         else:
             return u''
 
@@ -85,7 +87,13 @@ class TransField(models.Field):
         return result
 
     def get_db_prep_save(self, value):
-        value = [u"'%s': '''%s'''" % (k, v) for k, v in value.raw_data.items()]
+        language_codes = [lang[0] for lang in  settings.LANGUAGES]
+        raw_data = deepcopy(value.raw_data)
+        for code in language_codes:
+            local_value = raw_data.get(code,None)
+            if not local_value or local_value.strip() == "":
+                raw_data[code] = raw_data[settings.LANGUAGE_CODE]
+        value = [u"'%s': '''%s'''" % (k, smart_unicode(v)) for k, v in raw_data.items()]
         value = u'{%s}' % u','.join(value)
         return smart_str(value)
 
@@ -102,6 +110,21 @@ class TransField(models.Field):
         for k,v in raw_data.items():
             raw_data[k] = smart_str(v)
         return {self.attname: raw_data}
+
+    def validate(self, value, model_instance):
+        """
+        Validates value and throws ValidationError. Subclasses should override
+        this to provide validation logic.
+        """
+        if not self.editable:
+            # Skip validation for non-editable fields.
+            return
+        if value is None and not self.null:
+            raise exceptions.ValidationError(self.error_messages['null'])
+
+        if not self.blank and len(filter(lambda v: v in validators.EMPTY_VALUES, value.raw_data.values())) == len(value.raw_data.values()):
+            raise exceptions.ValidationError(self.error_messages['blank'])
+
 
 class TransCharField(TransField):
     '''
