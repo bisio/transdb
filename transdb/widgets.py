@@ -27,7 +27,7 @@ class TransCharWidget(Widget):
         else:
             value_dict = {}
         output = []
-        for lang_code, lang_name in settings.LANGUAGES:
+        for lang_code, lang_name in settings.ACTUAL_LANGUAGES:
             value_for_lang = ''
             if value_dict.has_key(lang_code):
                 value_for_lang = value_dict[lang_code]
