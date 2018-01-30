@@ -86,7 +86,7 @@ class TransField(models.Field):
             result.raw_data = {settings.LANGUAGE_CODE: value}
         return result
 
-    def get_db_prep_save(self, value):
+    def get_db_prep_save(self, value, connection, prepared=False):
         language_codes = [lang[0] for lang in  settings.LANGUAGES]
         raw_data = deepcopy(value.raw_data)
         for code in language_codes:
